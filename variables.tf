@@ -1,5 +1,5 @@
 variable "cluster_name" {
-  type = string 
+  type    = string
   default = "iw-aks-cluster"
 }
 variable "cluster_version" {
