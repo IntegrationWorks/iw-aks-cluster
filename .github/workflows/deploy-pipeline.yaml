@@ -1,96 +1,96 @@
-# name: deploy-pipeline
-# run-name: ${{ github.repository }} deploy pipeline
-# on:
-#   schedule:
-#     - cron: '00 6 * * *' #***THIS WILL DELETE YOUR CLUSTER AT 11:30 PM NZT***
-#   workflow_dispatch:
-#     inputs:
-#       environment:
-#         type: choice
-#         description: Environment to deploy
-#         options: 
-#         - dev
-#         default: dev
-#       destroy:
-#         type: boolean
-#         description: Destroy Terraform
-#         default: false
+name: deploy-pipeline
+run-name: ${{ github.repository }} deploy pipeline
+on:
+  schedule:
+    - cron: '00 6 * * *' #***THIS WILL DELETE YOUR CLUSTER***
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        description: Environment to deploy
+        options: 
+        - dev
+        default: dev
+      destroy:
+        type: boolean
+        description: Destroy Terraform
+        default: false
 
-# jobs:
-#   deploy:
-#     name: 'Deploy ${{ github.event.inputs.environment }}'
-#     env:
-#       ENVIRONMENT: ${{ github.event.inputs.environment }}
-#       TF_INPUT: false
-#       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }} #CHANGE
-#       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }} #CHANGE
-#       REPO_NAME: ${{ github.event.repository.name }}
-#       GITHUB_CONTAINER_TOKEN: ${{ secrets.IW_GITHUB_CONTAINER_TOKEN }}
-#     runs-on: ubuntu-latest
-#     steps:
+jobs:
+  deploy:
+    name: 'Deploy ${{ github.event.inputs.environment }}'
+    env:
+      ENVIRONMENT: ${{ github.event.inputs.environment }}
+      TF_INPUT: false
+      REPO_NAME: ${{ github.event.repository.name }}
+      GITHUB_CONTAINER_TOKEN: ${{ secrets.IW_GITHUB_CONTAINER_TOKEN }}
+      AKS_CLUSTER_NAME: ${{ github.event.inputs.cluster }}
+      AZ_RESOURCE_GROUP: ${{ github.event.inputs.resource-group }}
+      ARM_CLIENT_ID: ${{secrets.ARM_CLIENT_ID}}
+      ARM_CLIENT_SECRET: ${{secrets.ARM_CLIENT_SECRET}}
+      ARM_TENANT_ID: ${{secrets.ARM_TENANT_ID}}
+      ARM_SUBSCRIPTION_ID: ${{secrets.ARM_SUBSCRIPTION_ID}}
+    runs-on: ubuntu-latest
+    steps:
 
-#       - name: Checkout
-#         uses: actions/checkout@v2
+      - name: Checkout
+        uses: actions/checkout@v2
 
-#       - name: Set the variables
-#         env:
-#           DEFAULT_ENV: 'dev'
-#         run: |
-#           echo "ENVIRONMENT=${{ github.event.inputs.environment || env.DEFAULT_ENV }}" >> $GITHUB_ENV
-#           echo "IS_SCHEDULED=${{ github.event_name == 'schedule' }}" >> $GITHUB_ENV
+      - name: Set the variables
+        env:
+          DEFAULT_ENV: 'dev'
+        run: |
+          echo "ENVIRONMENT=${{ github.event.inputs.environment || env.DEFAULT_ENV }}" >> $GITHUB_ENV
+          echo "IS_SCHEDULED=${{ github.event_name == 'schedule' }}" >> $GITHUB_ENV
 
-#       - name: Setup Terraform
-#         uses: hashicorp/setup-terraform@v1
-#         with:
-#           terraform_version: 1.7.4
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: '{"clientId": "${{ env.ARM_CLIENT_ID}}", "clientSecret":"${{env.ARM_CLIENT_SECRET}}", "tenantId": "${{ env.ARM_TENANT_ID}}","subscriptionId": "${{ env.ARM_SUBSCRIPTION_ID}}"}'
 
-#       - name: Terraform Init
-#         run: |
-#           terraform init -backend-config="key=${{ env.REPO_NAME }}-${{ env.ENVIRONMENT }}.tfstate"
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 1.7.4
 
-#       - name: Terraform Validate
-#         run: |
-#           terraform validate
+      - name: Terraform Init
+        run: |
+          terraform init -backend-config="key=${{ env.REPO_NAME }}-${{ env.ENVIRONMENT }}.tfstate"
 
-#       - name: Terraform Plan
-#         if: github.event.inputs.destroy == 'false'
-#         id: plan
-#         run: |
-#           terraform plan -out=plan.out -var-file="tfvars/${{ env.ENVIRONMENT }}.tfvars"
+      - name: Terraform Validate
+        run: |
+          terraform validate
 
-#       - name: Terraform Apply
-#         if: github.event.inputs.destroy == 'false'
-#         run: |
-#           terraform apply -auto-approve plan.out
+      - name: Terraform Plan
+        if: github.event.inputs.destroy == 'false'
+        id: plan
+        run: |
+          terraform plan -out=plan.out -var-file="tfvars/${{ env.ENVIRONMENT }}.tfvars"
 
-#       - name: Terraform Destroy
-#         if: github.event.inputs.destroy == 'true' || env.IS_SCHEDULED == 'true'
-#         run: |
-#           terraform destroy -auto-approve -var-file="tfvars/${{ env.ENVIRONMENT }}.tfvars"
+      - name: Terraform Apply
+        if: github.event.inputs.destroy == 'false'
+        run: |
+          terraform apply -auto-approve plan.out
 
-#       - name: Configure AWS credentials #CHANGE
-#         if: github.event.inputs.destroy == 'false'
-#         uses: aws-actions/configure-aws-credentials@v1
-#         with:
-#           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#           aws-region: ap-southeast-2
+      - name: Terraform Destroy
+        if: github.event.inputs.destroy == 'true' || env.IS_SCHEDULED == 'true'
+        run: |
+          terraform destroy -auto-approve -var-file="tfvars/${{ env.ENVIRONMENT }}.tfvars"
 
-#       - name: Update kube config
-#         if: github.event.inputs.destroy == 'false'
-#         run: aws eks update-kubeconfig --name ${{ github.event.repository.name }} --region ap-southeast-2 #CHANGE
+      - name: Update kube config
+        run: az aks get-credentials --resource-group $AZ_RESOURCE_GROUP --name $AKS_CLUSTER_NAME
 
-#       - name: Set up Kubectl
-#         if: github.event.inputs.destroy == 'false'
-#         uses: azure/setup-kubectl@v1
-#         with:
-#           version: 'v1.29.0'
+      - name: Set up Kubectl
+        if: github.event.inputs.destroy == 'false'
+        uses: azure/setup-kubectl@v1
+        with:
+          version: 'v1.29.0'
 
-#       - name: Create Docker Registry Secret
-#         if: github.event.inputs.destroy == 'false'
-#         run: |
-#           kubectl get secret github-token || \
-#           kubectl create secret docker-registry github-token \
-#             --docker-server=ghcr.io \
-#             --docker-username=sladebutler \
-#             --docker-password=${{ env.GITHUB_CONTAINER_TOKEN }} 
+      - name: Create Docker Registry Secret
+        if: github.event.inputs.destroy == 'false'
+        run: |
+          kubectl get secret github-token || \
+          kubectl create secret docker-registry github-token \
+            --docker-server=ghcr.io \
+            --docker-username=sladebutler \
+            --docker-password=${{ env.GITHUB_CONTAINER_TOKEN }} 
