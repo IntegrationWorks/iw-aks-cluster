@@ -1,5 +1,5 @@
 data "azurerm_resource_group" "resource_group" {
-  name     = "adam-sandbox"
+  name = "adam-sandbox"
 }
 
 # resource "azurerm_network_security_group" "public-security-group" {
@@ -65,25 +65,25 @@ module "aks" {
   resource_group_name = data.azurerm_resource_group.resource_group.name
   location            = data.azurerm_resource_group.resource_group.location
 
-  prefix    = var.cluster_name
+  prefix             = var.cluster_name
   kubernetes_version = var.cluster_version
 
   agents_pool_name = "default"
-  agents_count = 1
+  agents_count     = 1
   agents_min_count = 1
   agents_max_count = 10
-  agents_size = "Standard_D2s_v3"
+  agents_size      = "Standard_D2s_v3"
 
   role_based_access_control_enabled = true
   log_analytics_workspace_enabled   = false
 
   rbac_aad_managed = false
-  rbac_aad  = false
+  rbac_aad         = false
 
   # vnet_subnet_id  = element(azurerm_virtual_network.vnet.subnet[*].id, count.index)
 
   os_disk_size_gb = 50
-  os_disk_type = "Ephemeral"
+  os_disk_type    = "Ephemeral"
 
   tags = {
     Environment = var.environment
