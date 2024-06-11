@@ -1,0 +1,33 @@
+name: build-pipeline
+run-name: ${{ github.repository }} build pipeline
+on:
+  push:
+    branches:    
+      - '**'
+
+jobs:
+  deploy-dev:
+    name: 'Terraform'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Terraform Lint
+        run: |
+          docker run --rm -v $(pwd):/data -t ghcr.io/terraform-linters/tflint --recursive
+          if [ $? -ne 0 ] ; then
+            echo "Terraform lint issues detected."
+            exit 1
+          fi
+
+      - name: Terraform Fmt
+        run: |
+          terraform fmt -recursive -diff -check
+          if [ $? -ne 0 ]
+          then
+            echo "Format check failed. Run 'terraform fmt' locally to resolve."
+            exit 1
+          fi
+
