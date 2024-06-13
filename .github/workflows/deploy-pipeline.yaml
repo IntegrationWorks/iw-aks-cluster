@@ -83,7 +83,7 @@ jobs:
 
       - name: Set up Kubectl
         if: github.event.inputs.destroy == 'false'
-        uses: azure/setup-kubectl@3
+        uses: azure/setup-kubectl@v3
         with:
           version: 'v1.29.0'
 
