@@ -30,7 +30,7 @@ module "aks" {
   rbac_aad_managed = false
   rbac_aad         = false
 
-  vnet_subnet_id  = data.azurerm_subnet.vnet-subnet.id
+  vnet_subnet_id = data.azurerm_subnet.vnet-subnet.id
 
   os_disk_size_gb = var.os_disk_size_gb
   os_disk_type    = var.os_disk_type
