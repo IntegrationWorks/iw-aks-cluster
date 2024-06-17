@@ -78,11 +78,12 @@ jobs:
           terraform destroy -auto-approve -var-file="tfvars/${{ env.ENVIRONMENT }}.tfvars"
 
       - name: Update kube config
-        run: az aks get-credentials --resource-group $AZ_RESOURCE_GROUP --name $AKS_CLUSTER_NAME
+        if: github.event.inputs.destroy == 'false'
+        run: az aks get-credentials --resource-group adam-sandbox --name ${{ github.event.repository.name }}-aks
 
       - name: Set up Kubectl
         if: github.event.inputs.destroy == 'false'
-        uses: azure/setup-kubectl@v1
+        uses: azure/setup-kubectl@v3
         with:
           version: 'v1.29.0'
 
