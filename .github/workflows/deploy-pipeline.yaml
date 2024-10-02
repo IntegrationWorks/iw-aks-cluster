@@ -2,7 +2,7 @@ name: deploy-pipeline
 run-name: ${{ github.repository }} deploy pipeline
 on:
   schedule:
-    - cron: '00 6 * * *' #***THIS WILL DELETE YOUR CLUSTER***
+    # - cron: '00 6 * * *' #***THIS WILL DELETE YOUR CLUSTER***
   workflow_dispatch:
     inputs:
       environment:
